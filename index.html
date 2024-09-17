@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in do Evento</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    h1 {
+      color: #333;
+    }
+    #relogio {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #007bff;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #555;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    input[type="button"] {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    input[type="button"]:hover {
+      background-color: #0056b3;
+    }
+    .success {
+      background-color: green;
+      color: white;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .warning {
+      background-color: yellow;
+      color: black;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .error {
+      background-color: black;
+      color: red;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    .payment_error {
+      background-color: black;
+      color: red;
+      padding: 10px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+    #dadosCliente {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+      background-color: #f0f0f0;
+      color: #333;
+      text-align: left;
+      display: none; /* Inicialmente oculto */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="relogio"></div>
+    <h1>Check-in do Evento</h1>
+    <form>
+      <label for="cpf">Digite seu CPF:</label>
+      <input type="text" id="cpf" name="cpf" required placeholder="000.000.000-00" maxlength="14">
+      <input type="button" value="Fazer Check-in" onclick="fazerCheckin()">
+    </form>
+    <div id="resultado"></div>
+    <div id="dadosCliente"></div> <!-- Exibe os dados do cliente -->
+  </div>
+  
+  <script>
+    // Função para atualizar o relógio
+    function atualizarRelogio() {
+      var agora = new Date();
+      var horas = agora.getHours().toString().padStart(2, '0');
+      var minutos = agora.getMinutes().toString().padStart(2, '0');
+      var segundos = agora.getSeconds().toString().padStart(2, '0');
+      document.getElementById('relogio').innerHTML = horas + ':' + minutos + ':' + segundos;
+    }
+
+    // Atualiza o relógio a cada segundo
+    setInterval(atualizarRelogio, 1000);
+
+    function fazerCheckin() {
+      var cpf = document.getElementById('cpf').value;
+
+      google.script.run.withSuccessHandler(function(response) {
+        var resultadoDiv = document.getElementById('resultado');
+        var dadosClienteDiv = document.getElementById('dadosCliente');
+
+        // Exibe a mensagem de status de check-in
+        resultadoDiv.innerHTML = response.status;
+        resultadoDiv.className = ''; // Limpa classes anteriores
+        var apresentaCliente = false;
+
+        // Exibe a classe CSS apropriada com base no status
+        if (response.status === 'CHECK-IN REALIZADO COM SUCESSO!') {
+          apresentaCliente = true;
+          resultadoDiv.classList.add('success');
+        } else if (response.status === 'CHECK-IN JÁ REALIZADO!') {
+          apresentaCliente = true;          
+          resultadoDiv.classList.add('warning');
+        } else if (response.status === 'CPF NÃO ENCONTRADO!') {
+          resultadoDiv.classList.add('error');
+        } else if (response.status === 'PAGAMENTO PENDENTE!') {
+          apresentaCliente = false;          
+          resultadoDiv.classList.add('payment_error');
+        }
+
+        // Exibe os dados do cliente se presentes no JSON
+        if (response.cliente && apresentaCliente) {
+          var telefoneFormatado = formatarTelefone(response.cliente.telefone);
+          var dataCheckinFormatada = formatarData(response.cliente.checkin); // Formata a data do check-in
+          dadosClienteDiv.style.display = 'block'; // Exibe a div
+          dadosClienteDiv.innerHTML = `
+            <h3>Dados do Cliente:</h3>
+            <p><strong>Nome:</strong> ${response.cliente.nome}</p>
+            <p><strong>Telefone:</strong> ${telefoneFormatado}</p>
+            <p><strong>Check-in:</strong> ${dataCheckinFormatada}</p>            
+          `;
+        } else {
+          dadosClienteDiv.style.display = 'none'; // Esconde a div caso não haja dados
+        }
+      }).verificarERegistrarEntrada(cpf);
+    }
+
+    // Função para formatar a data no formato dd/mm/yyyy hh:mm:ss
+    function formatarData(dataString) {
+      var data = new Date(dataString);
+      var dia = data.getDate().toString().padStart(2, '0');
+      var mes = (data.getMonth() + 1).toString().padStart(2, '0'); // Janeiro é 0
+      var ano = data.getFullYear();
+      var horas = data.getHours().toString().padStart(2, '0');
+      var minutos = data.getMinutes().toString().padStart(2, '0');
+      var segundos = data.getSeconds().toString().padStart(2, '0');
+
+      return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+    }
+
+    // Função para formatar o telefone (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+    function formatarTelefone(telefone) {
+      telefone = telefone.toString().replace(/\D/g, ''); // Remove tudo que não for dígito
+      if (telefone.length === 11) {
+        return telefone.toString().replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3'); // Formato (XX) XXXXX-XXXX
+      } else if (telefone.length === 10) {
+        return telefone.toString().replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3'); // Formato (XX) XXXX-XXXX
+      } else {
+        return telefone; // Se o número não tiver 10 ou 11 dígitos, retorna como está
+      }
+    }
+
+    // Função para adicionar máscara ao CPF
+    document.getElementById('cpf').addEventListener('input', function(e) {
+      // Limpa o campo de resultado ao começar a digitar
+      var resultadoDiv = document.getElementById('resultado');
+      resultadoDiv.innerHTML = '';
+      resultadoDiv.className = ''; // Remove a classe de estilo
+
+      // Limpa a div de dados do cliente
+      var dadosClienteDiv = document.getElementById('dadosCliente');
+      dadosClienteDiv.innerHTML = '';
+      dadosClienteDiv.style.display = 'none';
+
+      // Adiciona a máscara de CPF
+      var value = e.target.value.replace(/\D/g, ''); // Remove caracteres não numéricos
+      value = value.replace(/^(\d{3})(\d)/, '$1.$2');
+      value = value.replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+      value = value.replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+      e.target.value = value;
+    });
+  </script>
+</body>
+</html>
